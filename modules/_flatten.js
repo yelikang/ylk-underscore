@@ -9,6 +9,7 @@ export default function flatten(input, depth, strict, output) {
   if (!depth && depth !== 0) {
     depth = Infinity;
   } else if (depth <= 0) {
+    // 数组的concat,参数为对象，会被加入数组；参数为数组时，会合并进数组
     return output.concat(input);
   }
   var idx = output.length;
