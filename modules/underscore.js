@@ -12,6 +12,7 @@ export default function _(obj) {
 _.VERSION = VERSION;
 
 // Extracts the result from a wrapped and chained object.
+// 调用_.chain(xxx).value()，返回当前_wrapperd
 _.prototype.value = function() {
   return this._wrapped;
 };
