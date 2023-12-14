@@ -3,6 +3,16 @@
 // on. This helper accumulates all remaining arguments past the function’s
 // argument length (or an explicit `startIndex`), into an array that becomes
 // the last argument. Similar to ES6’s "rest parameter".
+
+// let test = restArguments(function(a,b){
+//   console.log(a, b)
+// })
+// // b会变成一个数组[2,3]，剩余的参数会归拢为一个数组
+// test(1,2,3)
+// // 1,[2,3]
+
+// 用于处理Rest参数(不定参数、剩余参数)
+// startIndex参数用于指定从原始函数参数列表的哪个位置开始算起为Rest参数
 export default function restArguments(func, startIndex) {
   startIndex = startIndex == null ? func.length - 1 : +startIndex;
   return function() {
