@@ -23,6 +23,10 @@ export default function debounce(func, wait, immediate) {
   var debounced = restArguments(function(_args) {
     context = this;
     args = _args;
+    // 这里多次执行防抖函数，每次更新previous的时间，
+    // 缩短later中执行 var passed = now() - previous 中passed的时间，从而延后执行
+
+    // 而lodash中是每次clearTimeout，重新创建新的timeout
     previous = now();
     if (!timeout) {
       timeout = setTimeout(later, wait);

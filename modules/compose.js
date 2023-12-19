@@ -1,5 +1,11 @@
 // Returns a function that is the composition of a list of functions, each
 // consuming the return value of the function that follows.
+
+/**
+ * 函数组合，函数从右到左执行
+ * 返回一个函数，该函数是一个函数列表的组合，每个函数,使用后面函数的返回值。
+ * @returns 
+ */
 export default function compose() {
   var args = arguments;
    // 从尾部开始，从右到左
