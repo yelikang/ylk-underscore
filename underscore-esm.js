@@ -52,27 +52,41 @@ var MAX_ARRAY_INDEX = Math.pow(2, 53) - 1;
 // on. This helper accumulates all remaining arguments past the function’s
 // argument length (or an explicit `startIndex`), into an array that becomes
 // the last argument. Similar to ES6’s "rest parameter".
+
+// let test = restArguments(function(a,b){
+//   console.log(a, b)
+// })
+// // b会变成一个数组[2,3]，剩余的参数会归拢为一个数组
+// test(1,2,3)
+// // 1,[2,3]
+
+// 用于处理Rest参数(不定参数、剩余参数)
+// startIndex参数用于指定从原始函数参数列表的哪个位置开始算起为Rest参数
 function restArguments(func, startIndex) {
-  startIndex = startIndex == null ? func.length - 1 : +startIndex;
-  return function() {
-    var length = Math.max(arguments.length - startIndex, 0),
-        rest = Array(length),
-        index = 0;
-    for (; index < length; index++) {
-      rest[index] = arguments[index + startIndex];
+    // func.length，返回函数有几个必填的参数，即形参个数( a=true 这种为非必填参数，不计入length)
+    startIndex = startIndex == null ? func.length - 1 : +startIndex;
+    return function () {
+        var length = Math.max(arguments.length - startIndex, 0),
+            rest = Array(length),
+            index = 0;
+        for (; index < length; index++) {
+            rest[index] = arguments[index + startIndex];
+        }
+        switch (startIndex) {
+            case 0:
+                return func.call(this, rest)
+            case 1:
+                return func.call(this, arguments[0], rest)
+            case 2:
+                return func.call(this, arguments[0], arguments[1], rest)
+        }
+        var args = Array(startIndex + 1);
+        for (index = 0; index < startIndex; index++) {
+            args[index] = arguments[index];
+        }
+        args[startIndex] = rest;
+        return func.apply(this, args)
     }
-    switch (startIndex) {
-      case 0: return func.call(this, rest);
-      case 1: return func.call(this, arguments[0], rest);
-      case 2: return func.call(this, arguments[0], arguments[1], rest);
-    }
-    var args = Array(startIndex + 1);
-    for (index = 0; index < startIndex; index++) {
-      args[index] = arguments[index];
-    }
-    args[startIndex] = rest;
-    return func.apply(this, args);
-  };
 }
 
 // Is a given variable an object?
@@ -93,6 +107,7 @@ function isUndefined(obj) {
 
 // Is a given value a boolean?
 function isBoolean(obj) {
+  // Object.prototype.toString.call(true) 会返回 [object Boolean]
   return obj === true || obj === false || toString.call(obj) === '[object Boolean]';
 }
 
@@ -195,6 +210,7 @@ function isNaN$1(obj) {
 }
 
 // Predicate-generating function. Often useful outside of Underscore.
+// 构建一个函数，用于每次都返回固定的参数；但是value是对象时，外部value改变还是会影响这里的输出
 function constant(value) {
   return function() {
     return value;
@@ -323,6 +339,7 @@ function _$1(obj) {
 _$1.VERSION = VERSION;
 
 // Extracts the result from a wrapped and chained object.
+// 调用_.chain(xxx).value()，返回当前_wrapperd
 _$1.prototype.value = function() {
   return this._wrapped;
 };
@@ -559,6 +576,12 @@ function invert(obj) {
 }
 
 // Return a sorted list of the function names available on the object.
+
+/**
+ * 返回一个对象里面的所有方法，并且是已经排序了
+ * @param {*} obj 
+ * @returns 
+ */
 function functions(obj) {
   var names = [];
   for (var key in obj) {
@@ -592,9 +615,14 @@ var extend = createAssigner(allKeys);
 // Assigns a given object with all the own properties in the passed-in
 // object(s).
 // (https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object/assign)
+/**
+ * 类似extend,但是只复制自身属性到目标对象，不包括集成过来的属性
+ */
 var extendOwn = createAssigner(keys);
 
 // Fill in a given object with default properties.
+// 用默认属性，填充给定对象
+// _.defaluts(obj, {name:'ylk'})
 var defaults = createAssigner(allKeys, true);
 
 // Create a naked function reference for surrogate-prototype-swapping.
@@ -654,6 +682,15 @@ function deepGet(obj, path) {
   var length = path.length;
   for (var i = 0; i < length; i++) {
     if (obj == null) return void 0;
+    // 重新为参数赋值，相当于在函数内部创建了一个新的局部变量；并指向新的对象，不影响原始参数对象的引用
+    // 但是可以修改原始参数的某个属性 Obj.xxx = 1
+
+    // 函数参数是按值传递(不管是基础类型，还是对象类型)
+    // 1.函数参数形参，与实参，开始时指向的都是同一块堆内存中的共享对象；
+    // 2.所以在函数内部可以通过 obj.xxx = xxx 修改这块共享对象的值
+    // 3.但是如果在函数内部直接改变obj的指向 obj = {}
+    // 4.就相当于新开辟了一块堆内存，创建了一个新的局部变量，obj指向了这块新的对象
+    // 5.所以并不会改变函数外部实参的指向
     obj = obj[path[i]];
   }
   return length ? obj : void 0;
@@ -663,6 +700,20 @@ function deepGet(obj, path) {
 // If any property in `path` does not exist or if the value is
 // `undefined`, return `defaultValue` instead.
 // The `path` is normalized through `_.toPath`.
+
+/**
+ * 通过路径，获取对象某个属性值；没取到使用默认值
+ * let obj = {a:{b:c:1}}
+ * _.get(obj, ['a','b', 'c'])
+ * => 1
+ * 
+ * 这里abc的属性写法只能通过数组，lodash更灵活; lodash.get(obj, 'a.b.c')
+ * 
+ * @param {*} object 
+ * @param {*} path 
+ * @param {*} defaultValue 
+ * @returns 
+ */
 function get(object, path, defaultValue) {
   var value = deepGet(object, toPath(path));
   return isUndefined(value) ? defaultValue : value;
@@ -671,6 +722,19 @@ function get(object, path, defaultValue) {
 // Shortcut function for checking if an object has a given property directly on
 // itself (in other words, not on a prototype). Unlike the internal `has`
 // function, this public version can also traverse nested properties.
+
+/**
+ * 判断对象是否有某个属性
+ * let user = {info:{name:'ylk'}}
+ * _.has(use, 'info')
+ * => true
+ * _.has(user, ['info','name'])
+ * =>true
+ * 
+ * @param {*} obj 
+ * @param {*} path 
+ * @returns 
+ */
 function has(obj, path) {
   path = toPath(path);
   var length = path.length;
@@ -826,13 +890,17 @@ var escapeMap = {
 };
 
 // Function for escaping strings to HTML interpolation.
-var _escape = createEscaper(escapeMap);
+/**
+ * 将HTML字符串中的特殊字符进行转译替换
+ * & => &amp
+ */
+var escape = createEscaper(escapeMap);
 
 // Internal list of HTML entities for unescaping.
 var unescapeMap = invert(escapeMap);
 
 // Function for unescaping strings from HTML interpolation.
-var _unescape = createEscaper(unescapeMap);
+var unescape = createEscaper(unescapeMap);
 
 // By default, Underscore uses ERB-style template delimiters. Change the
 // following template settings to use alternative delimiters.
@@ -990,6 +1058,16 @@ function executeBound(sourceFunc, boundFunc, context, callingContext, args) {
 // arguments pre-filled, without changing its dynamic `this` context. `_` acts
 // as a placeholder by default, allowing any combination of arguments to be
 // pre-filled. Set `_.partial.placeholder` for a custom placeholder argument.
+/**
+ *  创建一个已经预填充部分参数的函数，而不改变它的this上下文；也可以使用默认占位符_，告知在调用时刻提供参数
+ *  let subtract = function(a, b){return b - a}
+ *  sub5 = _.partial(subtract, 5) // a 预先填充为5
+ *  sub5(20) // 调用时传入 b = 20
+ * 
+ *  sub20 = _.partial(subtract, _, 20) // a使用_占位，b预先填充20
+ *  sub20(5) // 调用时传入a = 5
+ * 
+ */
 var partial = restArguments(function(func, boundArgs) {
   var placeholder = partial.placeholder;
   var bound = function() {
@@ -1028,6 +1106,7 @@ function flatten$1(input, depth, strict, output) {
   if (!depth && depth !== 0) {
     depth = Infinity;
   } else if (depth <= 0) {
+    // 数组的concat,参数为对象，会被加入数组；参数为数组时，会合并进数组
     return output.concat(input);
   }
   var idx = output.length;
@@ -1077,6 +1156,9 @@ function memoize(func, hasher) {
 
 // Delays a function for the given number of milliseconds, and then calls
 // it with the arguments supplied.
+/**
+ * 等待wait毫秒之后调用fnc
+ */
 var delay = restArguments(function(func, wait, args) {
   return setTimeout(function() {
     return func.apply(null, args);
@@ -1085,6 +1167,10 @@ var delay = restArguments(function(func, wait, args) {
 
 // Defers a function, scheduling it to run after the current call stack has
 // cleared.
+/**
+ * 延迟调用函数，知道当前调用栈清空为止；类似setTimeout(fn, 0)
+ * 实际上是调用delay, wait为1毫秒
+ */
 var defer = partial(delay, _$1, 1);
 
 // Returns a function, that, when invoked, will only be triggered at most once
@@ -1155,6 +1241,10 @@ function debounce(func, wait, immediate) {
   var debounced = restArguments(function(_args) {
     context = this;
     args = _args;
+    // 这里多次执行防抖函数，每次更新previous的时间，
+    // 缩短later中执行 var passed = now() - previous 中passed的时间，从而延后执行
+
+    // 而lodash中是每次clearTimeout，重新创建新的timeout
     previous = now();
     if (!timeout) {
       timeout = setTimeout(later, wait);
@@ -1187,18 +1277,30 @@ function negate(predicate) {
 
 // Returns a function that is the composition of a list of functions, each
 // consuming the return value of the function that follows.
+
+/**
+ * 函数组合，函数从右到左执行
+ * 返回一个函数，该函数是一个函数列表的组合，每个函数,使用后面函数的返回值。
+ * @returns 
+ */
 function compose() {
   var args = arguments;
+   // 从尾部开始，从右到左
   var start = args.length - 1;
   return function() {
     var i = start;
+    // 先单独执行最后一个函数，因为要根据arguments入参拿到出参result
+    // arguments为数组，所以要使用apply传递数组；后面的result都为一个对象，所以使用call
     var result = args[start].apply(this, arguments);
+    // 开始循环剩下的函数
     while (i--) result = args[i].call(this, result);
     return result;
   };
 }
 
 // Returns a function that will only be executed on and after the Nth call.
+// 返回一个函数，该函数只在第n次调用时和之后执行。
+// 可以结合webpack的needCalls函数，进行异常机制处理
 function after(times, func) {
   return function() {
     if (--times < 1) {
@@ -1209,6 +1311,8 @@ function after(times, func) {
 
 // Returns a function that will only be executed up to (but not including) the
 // Nth call.
+// 返回一个函数，该函数只执行到(但不包括)，第n次调用
+//  之后再调用这个函数，将返回一次最后调用func的结果。
 function before(times, func) {
   var memo;
   return function() {
@@ -1310,6 +1414,15 @@ function find(obj, predicate, context) {
 
 // Convenience version of a common use case of `_.find`: getting the first
 // object containing specific `key:value` pairs.
+
+/**
+ * 返回数组中包含特定属性的对象，例如attrs = {name:'ylk'}
+ * 就是找出集合中拥有name:ylk的对象
+ * 类似于sql 的where过滤条件
+ * @param {*} obj 
+ * @param {*} attrs 
+ * @returns 
+ */
 function findWhere(obj, attrs) {
   return find(obj, matcher(attrs));
 }
@@ -1598,6 +1711,15 @@ var indexBy = group(function(result, value, key) {
 // Counts instances of an object that group by a certain criterion. Pass
 // either a string attribute to count by, or a function that returns the
 // criterion.
+/**
+ * 对数组进行分组统计(指定分组规则，不传递则使用对象对比)，统计每个值的数目
+ * _.countBy([1, 2, 3, 4, 5], function(num) {
+ *  return num % 2 == 0 ? 'even': 'odd';
+ * });
+ * => {odd: 3, even: 2}
+ * _.countBy([1, 2, 3, 4, 5])
+ * => {1:1,2:2,3:1,4:1,5:1}
+ */
 var countBy = group(function(result, value, key) {
   if (has$1(result, key)) result[key]++; else result[key] = 1;
 });
@@ -1673,8 +1795,13 @@ function first(array, n, guard) {
 // Returns everything but the first entry of the `array`. Especially useful on
 // the `arguments` object. Passing an **n** will return the rest N values in the
 // `array`.
+
+// 传入一个数组
+// 返回剔除第一个元素后的数组副本
+// 如果传入参数 n，则剔除前 n 个元素
+// 也命名为drop
 function rest(array, n, guard) {
-  return slice.call(array, n == null || guard ? 1 : n);
+    return slice.call(array, n == null || guard ? 1 : n)
 }
 
 // Get the last element of an array. Passing **n** will return the last N
@@ -1686,18 +1813,33 @@ function last(array, n, guard) {
 }
 
 // Trim out all falsy values from an array.
+// 返回出去所有false(假值)的list副本 （false, null,0, '', undefined、NaN 都是 falsy假值）
+// 使用全局Boolean函数，进行Boolean(value)，就能过滤出是否假值
 function compact(array) {
   return filter(array, Boolean);
 }
 
 // Flatten out an array, either recursively (by default), or up to `depth`.
 // Passing `true` or `false` as `depth` means `1` or `Infinity`, respectively.
+
+
+/**
+ * 数组打平
+ * @param {*} array 数组
+ * @param {*} depth 打平深度(不传就全部打平)
+ * @returns 
+ */
 function flatten(array, depth) {
   return flatten$1(array, depth, false);
 }
 
 // Take the difference between one array and a number of other arrays.
 // Only the elements present in just the first array will remain.
+/**
+ * 对比一个数组与其它数组之间的差异，返回这个数组与其它数组的差异项
+ * _.difference([1, 2, 3, 4, 5], [5, 2, 10],[1]);
+ * => [3, 4]
+ */
 var difference = restArguments(function(array, rest) {
   rest = flatten$1(rest, true, true);
   return filter(array, function(value){
@@ -1832,14 +1974,18 @@ function chunk(array, count) {
 
 // Helper function to continue chaining intermediate results.
 function chainResult(instance, obj) {
+  // 如果当前对象为链式对象，把他的结果页构造成链式对象，这样就能继续调用；调用value方法可以获取链式对象的值
   return instance._chain ? _$1(obj).chain() : obj;
 }
 
 // Add your own custom functions to the Underscore object.
 function mixin(obj) {
+  // 循环underscore上的所有函数，进行一层装饰；实现underscore对象的chain（链式）调用
   each(functions(obj), function(name) {
+    // '_'上面也绑定对应的方法
     var func = _$1[name] = obj[name];
     _$1.prototype[name] = function() {
+      // 组装参数 _wrapperd(对象) + iterator(迭代器)
       var args = [this._wrapped];
       push.apply(args, arguments);
       return chainResult(this, func.apply(_$1, args));
@@ -1933,8 +2079,8 @@ var allExports = {
   times: times,
   random: random,
   now: now,
-  escape: _escape,
-  unescape: _unescape,
+  escape: escape,
+  unescape: unescape,
   templateSettings: templateSettings,
   template: template,
   result: result,
@@ -2034,6 +2180,5 @@ _._ = _;
 
 // ESM Exports
 
-export default _;
-export { VERSION, after, every as all, allKeys, some as any, extendOwn as assign, before, bind, bindAll, chain, chunk, clone, map as collect, compact, compose, constant, contains, countBy, create, debounce, defaults, defer, delay, find as detect, difference, rest as drop, each, _escape as escape, every, extend, extendOwn, filter, find, findIndex, findKey, findLastIndex, findWhere, first, flatten, reduce as foldl, reduceRight as foldr, each as forEach, functions, get, groupBy, has, first as head, identity, contains as include, contains as includes, indexBy, indexOf, initial, reduce as inject, intersection, invert, invoke, isArguments$1 as isArguments, isArray, isArrayBuffer, isBoolean, isDataView$1 as isDataView, isDate, isElement, isEmpty, isEqual, isError, isFinite$1 as isFinite, isFunction$1 as isFunction, isMap, isMatch, isNaN$1 as isNaN, isNull, isNumber, isObject, isRegExp, isSet, isString, isSymbol, isTypedArray$1 as isTypedArray, isUndefined, isWeakMap, isWeakSet, iteratee, keys, last, lastIndexOf, map, mapObject, matcher, matcher as matches, max, memoize, functions as methods, min, mixin, negate, noop, now, object, omit, once, pairs, partial, partition, pick, pluck, property, propertyOf, random, range, reduce, reduceRight, reject, rest, restArguments, result, sample, filter as select, shuffle, size, some, sortBy, sortedIndex, rest as tail, first as take, tap, template, templateSettings, throttle, times, toArray, toPath$1 as toPath, unzip as transpose, _unescape as unescape, union, uniq, uniq as unique, uniqueId, unzip, values, where, without, wrap, zip };
+export { VERSION, after, every as all, allKeys, some as any, extendOwn as assign, before, bind, bindAll, chain, chunk, clone, map as collect, compact, compose, constant, contains, countBy, create, debounce, _ as default, defaults, defer, delay, find as detect, difference, rest as drop, each, escape, every, extend, extendOwn, filter, find, findIndex, findKey, findLastIndex, findWhere, first, flatten, reduce as foldl, reduceRight as foldr, each as forEach, functions, get, groupBy, has, first as head, identity, contains as include, contains as includes, indexBy, indexOf, initial, reduce as inject, intersection, invert, invoke, isArguments$1 as isArguments, isArray, isArrayBuffer, isBoolean, isDataView$1 as isDataView, isDate, isElement, isEmpty, isEqual, isError, isFinite$1 as isFinite, isFunction$1 as isFunction, isMap, isMatch, isNaN$1 as isNaN, isNull, isNumber, isObject, isRegExp, isSet, isString, isSymbol, isTypedArray$1 as isTypedArray, isUndefined, isWeakMap, isWeakSet, iteratee, keys, last, lastIndexOf, map, mapObject, matcher, matcher as matches, max, memoize, functions as methods, min, mixin, negate, noop, now, object, omit, once, pairs, partial, partition, pick, pluck, property, propertyOf, random, range, reduce, reduceRight, reject, rest, restArguments, result, sample, filter as select, shuffle, size, some, sortBy, sortedIndex, rest as tail, first as take, tap, template, templateSettings, throttle, times, toArray, toPath$1 as toPath, unzip as transpose, unescape, union, uniq, uniq as unique, uniqueId, unzip, values, where, without, wrap, zip };
 //# sourceMappingURL=underscore-esm.js.map
